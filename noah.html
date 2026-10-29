@@ -958,16 +958,26 @@ var scrubBox=document.querySelector('[data-scrub]');
 if(scrubBox){
  var words=$$('.rt-w',scrubBox), cta=document.querySelector('[data-scrub-cta]'), st=document.querySelector('[data-scrub-state]');
  var reduced=window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+ var scrubTick=false;
  function scrubUpdate(){
    if(reduced){words.forEach(function(w){w.classList.add('on')}); if(cta)cta.classList.add('on'); if(st)st.textContent='読み終わりました'; return}
-   var r=scrubBox.getBoundingClientRect(), vh=window.innerHeight;
-   var total=r.height+vh*0.55, passed=vh*0.82-r.top, ratio=Math.max(0,Math.min(1,passed/total));
-   var n=Math.round(ratio*words.length);
-   words.forEach(function(w,i){w.classList.toggle('on',i<n)});
+   /* v3: per-word timing — each word lights when IT crosses the reading line
+      (74% of the *visual* viewport), so the effect follows the reader's eye
+      on any screen height, incl. iPhone with its collapsing toolbar. */
+   var vh=(window.visualViewport?window.visualViewport.height:window.innerHeight);
+   var line=vh*0.74, n=0;
+   words.forEach(function(w){
+     var wr=w.getBoundingClientRect();
+     var on=(wr.top+wr.height*0.4)<line;
+     w.classList.toggle('on',on); if(on)n++;
+   });
    if(cta)cta.classList.toggle('on',n>=words.length);
    if(st)st.textContent=(n>=words.length)?'読み終わりました':'読了 '+Math.round(n/words.length*100)+'%';
  }
- window.addEventListener('scroll',scrubUpdate,{passive:true}); window.addEventListener('resize',scrubUpdate); scrubUpdate();
+ function scrubSchedule(){ if(scrubTick)return; scrubTick=true; window.requestAnimationFrame(function(){scrubUpdate(); scrubTick=false;}); }
+ window.addEventListener('scroll',scrubSchedule,{passive:true}); window.addEventListener('resize',scrubSchedule);
+ if(window.visualViewport){ window.visualViewport.addEventListener('resize',scrubSchedule); window.visualViewport.addEventListener('scroll',scrubSchedule,{passive:true}); }
+ scrubUpdate();
 }
 /* RT-01 focus */
 var rItems=$$('[data-focus-list] .reason-item');
